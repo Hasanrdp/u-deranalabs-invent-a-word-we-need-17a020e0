@@ -28,7 +28,7 @@ EXPECTED_SHA256 = "bd8ea424128aa24ab7a4a4c4cf91a2ca678618dc8c94205dc5966bfd9d959
 OUTPUT_PATH = "/output/entry.txt"
 
 
-def verify(text: str) -> bytes:
+def encode_entry(text: str) -> bytes:
     """Return the line's bytes, or exit if they drifted from the pin."""
     encoded = text.encode("utf-8")
     if len(text) != EXPECTED_CHARS:
@@ -45,20 +45,28 @@ def verify(text: str) -> bytes:
     return encoded
 
 
+def verify(path: str, data: bytes) -> bool:
+    """Read the file back and confirm it holds exactly the pinned bytes."""
+    with open(path, "rb") as handle:
+        on_disk = handle.read()
+    if on_disk != data:
+        return False
+    if hashlib.sha256(on_disk).hexdigest() != EXPECTED_SHA256:
+        return False
+    return True
+
+
 def main() -> None:
-    payload = verify(WORD)
+    payload = encode_entry(WORD)
     directory = os.path.dirname(OUTPUT_PATH)
     if directory:
         os.makedirs(directory, exist_ok=True)
     with open(OUTPUT_PATH, "wb") as handle:
         handle.write(payload)
-    with open(OUTPUT_PATH, "rb") as handle:
-        on_disk = handle.read()
-    if on_disk != payload:
+    verified = verify(OUTPUT_PATH, payload)
+    if not verified:
         sys.exit("read-back mismatch: bytes on disk differ from the pinned line")
-    if hashlib.sha256(on_disk).hexdigest() != EXPECTED_SHA256:
-        sys.exit("read-back mismatch: sha256 on disk differs from the pinned hash")
-    print(f"wrote {len(on_disk)} bytes to {OUTPUT_PATH}")
+    print(f"wrote {len(payload)} bytes to {OUTPUT_PATH}")
 
 
 if __name__ == "__main__":
